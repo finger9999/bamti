@@ -20,7 +20,7 @@ function App() {
     formData.append("image", image)
 
     try {
-      const res = await fetch("http://localhost:3001/analyze", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/analyze`, {
         method: "POST",
         body: formData,
       })
