@@ -74,6 +74,16 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
 [출력 형식]
 반드시 아래 JSON 형식으로만 출력한다.
 다른 설명, 코드블록, 문장은 절대 포함하지 마라.
+
+{
+  "verdict": "밤티" | "통과",
+  "score": number,
+  "comment": string
+}
+
+- verdict, score, comment는 반드시 포함한다.
+- 하나라도 빠지면 실패다.
+- JSON 이외의 텍스트는 절대 출력하지 않는다.
               `,
             },
             {
