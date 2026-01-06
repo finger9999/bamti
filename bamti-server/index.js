@@ -15,26 +15,29 @@ const openai = new OpenAI({
 
 app.post("/analyze", upload.single("image"), async (req, res) => {
   try {
+    // ✅ 이의 제기 정보는 여기서 읽어야 함
+    const isAppeal = req.body?.appeal === "true"
+    const appealComment =
+      typeof req.body?.appeal_comment === "string"
+        ? req.body.appeal_comment.slice(0, 200)
+        : ""
+
     const imageBase64 = fs.readFileSync(req.file.path, {
       encoding: "base64",
     })
 
-    const response = await openai.responses.create({
-      model: "gpt-4.1-mini",
-      temperature: 0.1,
-      input: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: `
+    /* =======================
+       프롬프트 구성
+    ======================= */
+
+    const basePrompt = `
 너는 '밤티판독기'다.
 이 서비스는 놀이용이며, 평가가 다소 까칠할 수 있다.
 
 먼저 이미지가 무엇인지 판단한다.
 - 사람 얼굴 / 셀카
 - 동물
+- 캐릭터
 - 풍경 / 공간
 - 디자인 결과물 (포스터, 화면, 그래픽 등)
 
@@ -57,46 +60,68 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
   → 억지 비교는 절대 하지 않는다.
   → 없으면 언급하지 않는다.
 
-[동물 평가 기준]
-- 기본적으로 호의적이다.
-- 그래도 사진 자체가 애매하면 밤티가 나올 수 있다.
-- 귀여움을 노린 흔적이 너무 보이면 살짝 꼬집는다.
+[동물]
+- 기본적으로 호의적
+- 그래도 사진이 애매하면 밤티 가능
 
-[풍경 / 공간 평가 기준]
-- 어디를 보라는 건지는 따진다.
-- 구도가 어색하면 바로 말한다.
-- 색감이 과하면 솔직하게 말한다.
+[풍경 / 공간]
+- 구도, 시선 흐름 위주
+- 색감 과하면 바로 지적
 
-[디자인 / 화면 평가 기준]
-- 요소들이 싸우는지 본다.
-- 의도가 느껴지는지 본다.
-- 완성도보다 인상이 중요하다.
+[디자인]
+- 요소 간 충돌
+- 의도와 인상 위주
 
-[점수 산정]
-- 점수는 0~100점이다.
-- 평균적인 사진은 40~60점 사이가 나오도록 한다.
-- 인상이 특별히 좋지 않으면 60점을 넘기지 않는다.
-- 애매한 사진은 과감하게 30~50점을 준다.
-- 정말 인상이 좋을 때만 70점 이상을 준다.
-- 80점 이상은 매우 드물다.
+[점수]
+0점부터 시작
+- 평범: 50~65
+- 좋음: 70 전후
+- 매우 좋음: 80 이상은 드묾
 
 [밤티 판정]
-- 70점 미만이면 "밤티"
-- 70점 이상이면 "통과"
+70 미만: 밤티
+70 이상: 통과
+`
 
-[출력 형식]
-아래 JSON 형식을 정확히 따른다.
+    const appealPrompt = isAppeal
+      ? `
+[이의 제기]
+사용자가 판정에 이의를 제기했다.
+사용자 주장:
+"${appealComment}"
 
+- 주장은 읽었다는 티는 낸다
+- 끌려가지는 마라
+- 타당하면 최대 5~8점까지만 상향 가능
+`
+      : ""
+
+    const finalPrompt =
+      basePrompt +
+      appealPrompt +
+      `
+[출력]
+아래 JSON만 출력한다.
 {
   "verdict": "밤티" | "통과",
   "score": number,
   "comment": string
 }
+JSON 외 텍스트 금지.
+`
 
-- verdict, score, comment는 반드시 포함한다.
-- JSON 외의 텍스트는 절대 출력하지 않는다.
-              `,
-            },
+    /* =======================
+       OpenAI 호출
+    ======================= */
+
+    const response = await openai.responses.create({
+      model: "gpt-4.1-mini",
+      temperature: 0.1,
+      input: [
+        {
+          role: "user",
+          content: [
+            { type: "input_text", text: finalPrompt },
             {
               type: "input_image",
               image_url: `data:image/jpeg;base64,${imageBase64}`,
@@ -119,51 +144,40 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
     const rawText = message.text
     const jsonMatch = rawText.match(/\{[\s\S]*\}/)
 
-    function normalizeScore(raw) {
-      // raw: 모델이 준 점수 (보통 50~80)
-      // 목표: 0~100에 고르게 분포
-
-      // 1. 일단 상한/하한 클램프
-      const clamped = Math.max(20, Math.min(raw, 85))
-
-      // 2. 20~85 → 0~100 재매핑
-      const normalized = Math.round(((clamped - 20) / 65) * 100)
-
-      return normalized
-    }
-
     let parsed = {}
     if (jsonMatch) {
       try {
         parsed = JSON.parse(jsonMatch[0])
-      } catch { }
+      } catch {}
     }
 
-    // 3️⃣ 점수 결정 (정규화 적용)
+    /* =======================
+       점수 보정
+    ======================= */
+
+    function normalizeScore(raw) {
+      if (typeof raw !== "number" || isNaN(raw)) return null
+      const clamped = Math.max(20, Math.min(raw, 85))
+      return Math.round(((clamped - 20) / 65) * 100)
+    }
+
     let finalScore = normalizeScore(parsed.score)
-
-    // 모델이 점수 안 줬을 경우 fallback
     if (finalScore === null) {
-      finalScore = Math.floor(Math.random() * 40) + 30 // 30~69
+      finalScore = Math.floor(Math.random() * 40) + 30
     }
 
-    // 4️⃣ verdict를 점수 기준으로 재판정
     const finalVerdict = finalScore >= 70 ? "통과" : "밤티"
 
-
-    // 5️⃣ 최종 응답
-    const safeResult = {
+    res.json({
       verdict: finalVerdict,
       score: finalScore,
       comment:
         typeof parsed.comment === "string" && parsed.comment.length > 0
           ? parsed.comment
           : finalVerdict === "밤티"
-            ? "굳이 이 컷을 고른 이유는 잘 모르겠다."
-            : "무난하게 볼 수 있는 사진이다.",
-    }
-  
-    res.json(safeResult)
+          ? "굳이 이 컷을 고른 이유는 잘 모르겠다."
+          : "무난하게 볼 수는 있다.",
+    })
   } catch (err) {
     console.error(err)
     res.status(500).json({ result: "서버 에러" })
