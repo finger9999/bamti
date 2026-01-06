@@ -4,10 +4,11 @@ import "./App.css"
 
 function App() {
   const [image, setImage] = useState(null)
-  const [loading, setLoading] = useState(false)
   const [analysis, setAnalysis] = useState(null)
   const [appealUsed, setAppealUsed] = useState(false)
-  const [appealComment, setAppealComment] = useState("") // ✅ 추가됨
+  const [appealComment, setAppealComment] = useState("")
+  const [phase, setPhase] = useState("idle")
+  // idle | analyzing | result | appealing
 
   const handleAnalyze = async () => {
     if (!image) {
@@ -15,7 +16,7 @@ function App() {
       return
     }
 
-    setLoading(true)
+    setPhase("analyzing")
     setAnalysis(null)
     setAppealUsed(false)
     setAppealComment("")
@@ -30,16 +31,16 @@ function App() {
       })
       const parsed = await res.json()
       setAnalysis(parsed)
+      setPhase("result")
     } catch (err) {
       console.error(err)
       alert("판독 중 오류 발생")
-    } finally {
-      setLoading(false)
+      setPhase("idle")
     }
   }
 
   const handleAppeal = async () => {
-    setLoading(true)
+    setPhase("appealing")
 
     const formData = new FormData()
     formData.append("image", image)
@@ -54,11 +55,11 @@ function App() {
       const parsed = await res.json()
       setAnalysis(parsed)
       setAppealUsed(true)
+      setPhase("result")
     } catch (err) {
       console.error(err)
       alert("재판독 중 오류 발생")
-    } finally {
-      setLoading(false)
+      setPhase("result")
     }
   }
 
@@ -71,10 +72,10 @@ function App() {
         accept="image/*,.jpg,.jpeg,.png"
         onChange={(e) => {
           setImage(e.target.files[0])
+          setPhase("idle")
           setAnalysis(null)
           setAppealUsed(false)
           setAppealComment("")
-          setLoading(false)
         }}
       />
 
@@ -84,15 +85,22 @@ function App() {
 
       <br /><br />
 
-      {loading && (
-        <p>
-          {appealUsed
-            ? "다시 보고 있습니다…"
-            : "🔍 과연 밤티일까? 아닐까…"}
+      {/* 🔍 최초 판독 중 */}
+      {phase === "analyzing" && (
+        <p style={{ textAlign: "center", fontSize: 18 }}>
+          🔍 과연 밤티일까? 아닐까…
         </p>
       )}
 
-      {analysis && (
+      {/* 🔄 재판독 중 (사진/카드 없음) */}
+      {phase === "appealing" && (
+        <p style={{ textAlign: "center", fontSize: 18 }}>
+          🔄 다시 보고 있습니다…
+        </p>
+      )}
+
+      {/* 📊 결과 */}
+      {phase === "result" && analysis && (
         <div
           style={{
             border: "3px solid",
@@ -133,7 +141,7 @@ function App() {
 
           <p>{analysis.comment ?? "설명을 불러오지 못했습니다"}</p>
 
-          {analysis.verdict === "밤티" && !appealUsed && !loading && (
+          {analysis.verdict === "밤티" && !appealUsed && (
             <div style={{ marginTop: 16 }}>
               <textarea
                 placeholder="억울한 이유를 적어보세요 (선택)"
