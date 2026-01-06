@@ -21,7 +21,7 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
 
     const response = await openai.responses.create({
       model: "gpt-4.1-mini",
-      temperature: 0.1, 
+      temperature: 0.1,
       input: [
         {
           role: "user",
@@ -87,17 +87,26 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
 
     fs.unlinkSync(req.file.path)
 
-    const rawText = response.output_text
+    const message = response.output[0].content.find(
+      (c) => c.type === "output_text"
+    )
+
+    if (!message?.text) {
+      throw new Error("모델 응답 텍스트 없음")
+    }
+
+    const rawText = message.text
     // JSON 부분만 추출
     const jsonMatch = rawText.match(/\{[\s\S]*\}/)
 
     if (!jsonMatch) {
       throw new Error("JSON 추출 실패")
     }
-    
+
     const parsed = JSON.parse(jsonMatch[0])
 
     res.json(parsed)
+
   } catch (err) {
     console.error(err)
     res.status(500).json({ result: "서버 에러" })
