@@ -40,7 +40,6 @@ function App() {
 
   const handleAppeal = async () => {
     setLoading(true)
-    setAppealUsed(true)
 
     const formData = new FormData()
     formData.append("image", image)
@@ -54,6 +53,7 @@ function App() {
       })
       const parsed = await res.json()
       setAnalysis(parsed)
+      setAppealUsed(true)
     } catch (err) {
       console.error(err)
       alert("재판독 중 오류 발생")
@@ -84,7 +84,13 @@ function App() {
 
       <br /><br />
 
-      {loading && <p>🔍 과연 밤티일까? 아닐까..</p>}
+      {loading && (
+        <p>
+          {appealUsed
+            ? "다시 보고 있습니다…"
+            : "🔍 과연 밤티일까? 아닐까…"}
+        </p>
+      )}
 
       {analysis && (
         <div
