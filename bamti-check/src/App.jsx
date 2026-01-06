@@ -41,7 +41,7 @@ function App() {
 
       <input
         type="file"
-        accept="image/*"
+        accept="image/*,.jpg,.jpeg,.png"
         onChange={(e) => {
           setImage(e.target.files[0])
           setAnalysis(null)
