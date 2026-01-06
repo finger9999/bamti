@@ -72,6 +72,7 @@ function App() {
         >
           <h2 style={{ fontSize: 32 }}>
             {analysis.verdict === "밤티" ? "밤티입니다" : "통과"}
+            
           </h2>
 
           {/* 📸 사용자 사진 + 도장 */}
@@ -102,11 +103,11 @@ function App() {
           </div>
 
           {/* 📊 결과 텍스트 */}
-          <p style={{ fontSize: 20 }}>
+          <p style={{ fontSize: 20, color: "#111" }}>
             점수: <strong>{analysis.score}</strong>
           </p>
 
-          <p style={{ marginTop: 12 }}>{analysis.comment}</p>
+          <p style={{ marginTop: 12, color: "#333" }}>{analysis.comment}</p>
         </div>
       )}
     </div>
