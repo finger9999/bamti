@@ -73,10 +73,12 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
 - 완성도보다 인상이 중요하다.
 
 [점수 산정]
-- 총점은 0~100점이다.
-- 무난한 사진은 70점을 넘기지 않는다.
+- 점수는 0~100점이다.
+- 평균적인 사진은 40~60점 사이가 나오도록 한다.
+- 인상이 특별히 좋지 않으면 60점을 넘기지 않는다.
+- 애매한 사진은 과감하게 30~50점을 준다.
 - 정말 인상이 좋을 때만 70점 이상을 준다.
-- 85점 이상은 드물다.
+- 80점 이상은 매우 드물다.
 
 [밤티 판정]
 - 70점 미만이면 "밤티"
@@ -117,6 +119,19 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
     const rawText = message.text
     const jsonMatch = rawText.match(/\{[\s\S]*\}/)
 
+    function normalizeScore(raw) {
+      // raw: 모델이 준 점수 (보통 50~80)
+      // 목표: 0~100에 고르게 분포
+
+      // 1. 일단 상한/하한 클램프
+      const clamped = Math.max(20, Math.min(raw, 85))
+
+      // 2. 20~85 → 0~100 재매핑
+      const normalized = Math.round(((clamped - 20) / 65) * 100)
+
+      return normalized
+    }
+
     let parsed = {}
     if (jsonMatch) {
       try {
@@ -124,23 +139,30 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
       } catch { }
     }
 
+    // 3️⃣ 점수 결정 (정규화 적용)
+    let finalScore = normalizeScore(parsed.score)
+
+    // 모델이 점수 안 줬을 경우 fallback
+    if (finalScore === null) {
+      finalScore = Math.floor(Math.random() * 40) + 30 // 30~69
+    }
+
+    // 4️⃣ verdict를 점수 기준으로 재판정
+    const finalVerdict = finalScore >= 70 ? "통과" : "밤티"
+
+
+    // 5️⃣ 최종 응답
     const safeResult = {
-      verdict:
-        parsed.verdict === "밤티" || parsed.verdict === "통과"
-          ? parsed.verdict
-          : "통과",
-
-      score:
-        typeof parsed.score === "number"
-          ? parsed.score
-          : Math.floor(Math.random() * 15) + 75,
-
+      verdict: finalVerdict,
+      score: finalScore,
       comment:
         typeof parsed.comment === "string" && parsed.comment.length > 0
           ? parsed.comment
-          : "귀여움이 모든 미적 결함을 덮었습니다.",
+          : finalVerdict === "밤티"
+            ? "굳이 이 컷을 고른 이유는 잘 모르겠다."
+            : "무난하게 볼 수 있는 사진이다.",
     }
-
+  
     res.json(safeResult)
   } catch (err) {
     console.error(err)
