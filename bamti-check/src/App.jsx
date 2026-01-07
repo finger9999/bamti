@@ -1,4 +1,6 @@
 import { useState } from "react"
+import ProgressBar from "./components/ProgressBar"
+import ResultCard from "./components/ResultCard"
 import "./App.css"
 
 /* =====================
@@ -95,9 +97,12 @@ function App() {
 
       {/* 🔍 최초 판독 중 */}
       {phase === PHASE.ANALYZING && (
-        <p style={{ textAlign: "center", fontSize: 18 }}>
-          🔍 과연 밤티일까? 아닐까…
-        </p>
+        <div style={{ textAlign: "center", marginTop: 40 }}>
+          <p className='gradient-text'>
+            🔍 과연 밤티일까? 아닐까…
+          </p>
+          <ProgressBar />
+        </div>
       )}
 
       {/* 🔄 재판독 중 (사진/카드 없음) */}
