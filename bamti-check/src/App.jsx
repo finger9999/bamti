@@ -1,11 +1,22 @@
 import { useState } from "react"
-import bamtiImg from "./assets/bamti_image.png"
-import "./App.css" // bamti-stamp 애니메이션용
+import "./App.css"
+
+/* =====================
+   Phase 정의
+===================== */
+const PHASE = {
+  IDLE: "idle",
+  ANALYZING: "analyzing",
+  APPEALING: "appealing",
+  RESULT: "result",
+}
 
 function App() {
   const [image, setImage] = useState(null)
-  const [loading, setLoading] = useState(false)
   const [analysis, setAnalysis] = useState(null)
+  const [appealUsed, setAppealUsed] = useState(false)
+  const [appealComment, setAppealComment] = useState("")
+  const [phase, setPhase] = useState(PHASE.IDLE)
 
   const handleAnalyze = async () => {
     if (!image) {
@@ -13,8 +24,10 @@ function App() {
       return
     }
 
-    setLoading(true)
+    setPhase(PHASE.ANALYZING)
     setAnalysis(null)
+    setAppealUsed(false)
+    setAppealComment("")
 
     const formData = new FormData()
     formData.append("image", image)
@@ -24,14 +37,37 @@ function App() {
         method: "POST",
         body: formData,
       })
-
       const parsed = await res.json()
       setAnalysis(parsed)
+      setPhase(PHASE.RESULT)
     } catch (err) {
       console.error(err)
       alert("판독 중 오류 발생")
-    } finally {
-      setLoading(false)
+      setPhase("idle")
+    }
+  }
+
+  const handleAppeal = async () => {
+    setPhase(PHASE.APPEALING)
+
+    const formData = new FormData()
+    formData.append("image", image)
+    formData.append("appeal", "true")
+    formData.append("appeal_comment", appealComment)
+
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/analyze`, {
+        method: "POST",
+        body: formData,
+      })
+      const parsed = await res.json()
+      setAnalysis(parsed)
+      setAppealUsed(true)
+      setPhase(PHASE.RESULT)
+    } catch (err) {
+      console.error(err)
+      alert("재판독 중 오류 발생")
+      setPhase(PHASE.RESULT)
     }
   }
 
@@ -44,8 +80,10 @@ function App() {
         accept="image/*,.jpg,.jpeg,.png"
         onChange={(e) => {
           setImage(e.target.files[0])
+          setPhase(PHASE.IDLE)
           setAnalysis(null)
-          setLoading(false)
+          setAppealUsed(false)
+          setAppealComment("")
         }}
       />
 
@@ -55,59 +93,30 @@ function App() {
 
       <br /><br />
 
-      {loading && <p>🔍 과연 밤티일까? 아닐까.. </p>}
+      {/* 🔍 최초 판독 중 */}
+      {phase === PHASE.ANALYZING && (
+        <p style={{ textAlign: "center", fontSize: 18 }}>
+          🔍 과연 밤티일까? 아닐까…
+        </p>
+      )}
 
-      {analysis && (
-        <div
-          style={{
-            border: "3px solid",
-            borderColor: analysis.verdict === "밤티" ? "crimson" : "green",
-            padding: 24,
-            marginTop: 20,
-            borderRadius: 12,
-            background:
-              analysis.verdict === "밤티" ? "#fff0f0" : "#f0fff4",
-            textAlign: "center",
-          }}
-        >
-          <h2 style={{ fontSize: 32 }}>
-            {analysis.verdict === "밤티" ? "밤티입니다" : "통과"}
-          </h2>
+      {/* 🔄 재판독 중 (사진/카드 없음) */}
+      {phase === PHASE.APPEALING && (
+        <p style={{ textAlign: "center", fontSize: 18 }}>
+          🔄 다시 보고 있습니다…
+        </p>
+      )}
 
-          {/* 📸 사용자 사진 + 도장 */}
-          <div
-            style={{
-              position: "relative",
-              width: 300,
-              margin: "0 auto 20px",
-            }}
-          >
-            <img
-              src={URL.createObjectURL(image)}
-              alt="사용자 이미지"
-              style={{
-                width: "100%",
-                borderRadius: 12,
-                display: "block",
-              }}
-            />
-
-            {analysis.verdict === "밤티" && (
-              <img
-                src={bamtiImg}
-                alt="밤티 도장"
-                className="bamti-stamp"
-              />
-            )}
-          </div>
-
-          {/* 📊 결과 텍스트 */}
-          <p style={{ fontSize: 20 }}>
-            점수: <strong>{analysis.score}</strong>
-          </p>
-
-          <p style={{ marginTop: 12 }}>{analysis.comment}</p>
-        </div>
+      {/* 📊 결과 */}
+      {phase === PHASE.RESULT && analysis && (
+        <ResultCard
+          image={image}
+          analysis={analysis}
+          appealUsed={appealUsed}
+          appealComment={appealComment}
+          onChangeAppealComment={setAppealComment}
+          onAppeal={handleAppeal}
+        />
       )}
     </div>
   )
