@@ -1,6 +1,6 @@
-import { useState } from "react"
 import ProgressBar from "./components/ProgressBar"
 import ResultCard from "./components/ResultCard"
+import { useState, useEffect } from "react"
 import "./App.css"
 
 /* =====================
@@ -19,6 +19,24 @@ function App() {
   const [appealUsed, setAppealUsed] = useState(false)
   const [appealComment, setAppealComment] = useState("")
   const [phase, setPhase] = useState(PHASE.IDLE)
+  const [progress, setProgress] = useState(0)
+
+  useEffect(() => {
+    let timer
+
+    if (phase === PHASE.ANALYZING || phase === PHASE.APPEALING) {
+      timer = setInterval(() => {
+        setProgress((prev) => {
+          if (prev >= 95) return prev
+          return prev + Math.random() * 6
+        })
+      }, 120)
+    }
+
+    return () => {
+      if (timer) clearInterval(timer)
+    }
+  }, [phase])
 
   const handleAnalyze = async () => {
     if (!image) {
@@ -26,6 +44,7 @@ function App() {
       return
     }
 
+    setProgress(0)
     setPhase(PHASE.ANALYZING)
     setAnalysis(null)
     setAppealUsed(false)
@@ -50,6 +69,7 @@ function App() {
   }
 
   const handleAppeal = async () => {
+    setProgress(0)
     setPhase(PHASE.APPEALING)
 
     const formData = new FormData()
@@ -65,6 +85,7 @@ function App() {
       const parsed = await res.json()
       setAnalysis(parsed)
       setAppealUsed(true)
+      setProgress(100)
       setPhase(PHASE.RESULT)
     } catch (err) {
       console.error(err)
@@ -101,7 +122,7 @@ function App() {
           <p className='gradient-text'>
             🔍 과연 밤티일까? 아닐까…
           </p>
-          <ProgressBar />
+          <ProgressBar progress={progress} />
         </div>
       )}
 
