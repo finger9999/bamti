@@ -128,7 +128,3 @@
     background-position: 0% 50%;
   }
 }
-
-.progress-fill {
-  transition: width 0.25s ease;
-}

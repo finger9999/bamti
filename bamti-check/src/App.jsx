@@ -122,7 +122,7 @@ function App() {
           <p className='gradient-text'>
             🔍 과연 밤티일까? 아닐까…
           </p>
-          <ProgressBar progress={progress} />
+          <ProgressBar />
         </div>
       )}
 
