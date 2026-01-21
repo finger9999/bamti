@@ -114,27 +114,30 @@ JSON 외 텍스트 금지.
        OpenAI 호출
     ======================= */
 
-    const response = await openai.responses.create({
-      model: "gpt-4.1-mini",
-      temperature: 0.1,
-      input: [
+    const response = await openai.chat.completions.create({
+  model: "gpt-4o-mini", // 모델명 수정
+  messages: [
+    {
+      role: "user",
+      content: [
+        { type: "text", text: finalPrompt },
         {
-          role: "user",
-          content: [
-            { type: "input_text", text: finalPrompt },
-            {
-              type: "input_image",
-              image_url: `data:image/jpeg;base64,${imageBase64}`,
-            },
-          ],
+          type: "image_url",
+          image_url: {
+            url: `data:image/jpeg;base64,${imageBase64}`,
+          },
         },
       ],
-    })
+    },
+  ],
+  response_format: { type: "json_object" }, // JSON 출력 강제 (더 안전함)
+  temperature: 0.5, // 너무 낮으면 답변이 단조로우니 0.5 정도로 추천
+});
 
     fs.unlinkSync(req.file.path)
 
-    const message = response.output[0].content.find(
-      (c) => c.type === "output_text"
+    const message = response.choices[0].message.content.find(
+      (c) => c.type === "text"
     )
 
     if (!message?.text) {
