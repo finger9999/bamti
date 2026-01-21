@@ -1,4 +1,5 @@
 import { useState } from "react"
+import ResultCard from "./components/ResultCard"
 import "./App.css"
 
 /* =====================
