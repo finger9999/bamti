@@ -115,43 +115,42 @@ JSON 외 텍스트 금지.
     ======================= */
 
     const response = await openai.chat.completions.create({
-  model: "gpt-4o-mini", // 모델명 수정
-  messages: [
-    {
-      role: "user",
-      content: [
-        { type: "text", text: finalPrompt },
+      model: "gpt-4o-mini", // 모델명 수정
+      messages: [
         {
-          type: "image_url",
-          image_url: {
-            url: `data:image/jpeg;base64,${imageBase64}`,
-          },
+          role: "user",
+          content: [
+            { type: "text", text: finalPrompt },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:image/jpeg;base64,${imageBase64}`,
+              },
+            },
+          ],
         },
       ],
-    },
-  ],
-  response_format: { type: "json_object" }, // JSON 출력 강제 (더 안전함)
-  temperature: 0.5, // 너무 낮으면 답변이 단조로우니 0.5 정도로 추천
-});
+      response_format: { type: "json_object" }, // JSON 출력 강제 (더 안전함)
+      temperature: 0.5, // 너무 낮으면 답변이 단조로우니 0.5 정도로 추천
+    });
 
     fs.unlinkSync(req.file.path)
 
-    const message = response.choices[0].message.content.find(
-      (c) => c.type === "text"
-    )
+    // 1. 응답 텍스트 가져오기 (배열이 아니라 문자열임)
+    const rawText = response.choices[0].message.content;
 
-    if (!message?.text) {
-      throw new Error("모델 응답 텍스트 없음")
+    if (!rawText) {
+      throw new Error("모델 응답 텍스트 없음");
     }
 
-    const rawText = message.text
-    const jsonMatch = rawText.match(/\{[\s\S]*\}/)
-
-    let parsed = {}
-    if (jsonMatch) {
-      try {
-        parsed = JSON.parse(jsonMatch[0])
-      } catch {}
+    // 2. JSON 파싱 (이미 json_object 형식이므로 정규식 없이 바로 가능)
+    let parsed = {};
+    try {
+      parsed = JSON.parse(rawText);
+    } catch (e) {
+      console.error("JSON 파싱 실패:", e);
+      // 파싱 실패 시 기본값 설정
+      parsed = { score: 50, comment: "판독기가 잠시 정신을 놓았다." };
     }
 
     /* =======================
@@ -178,8 +177,8 @@ JSON 외 텍스트 금지.
         typeof parsed.comment === "string" && parsed.comment.length > 0
           ? parsed.comment
           : finalVerdict === "밤티"
-          ? "굳이 이 컷을 고른 이유는 잘 모르겠다."
-          : "무난하게 볼 수는 있다.",
+            ? "굳이 이 컷을 고른 이유는 잘 모르겠다."
+            : "무난하게 볼 수는 있다.",
     })
   } catch (err) {
     console.error(err)
